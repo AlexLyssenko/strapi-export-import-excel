@@ -160,7 +160,8 @@ const HomePage = () => {
       <Typography variant="pi" as="p">
           This plugin is developed for free use. The developer is happy for you to use or modify it as needed. 
           You can find more information on 
-          <a href="https://github.com/kidkarnmai/export-import-kkm" target="_blank" rel="noopener noreferrer"> the project's GitHub page</a>. 
+          <a href="https://github.com/AlexLyssenko/strapi-export-import-excel" target="_blank" rel="noopener noreferrer"> the project's GitHub page</a>. 
+          Based on <a href="https://github.com/kidkarnmai/export-import-kkm" target="_blank" rel="noopener noreferrer">export-import-kkm</a> by Kidkarnmai Studio. 
           For a more complete installation package, you can check out <a href='https://www.npmjs.com/package/strapi-backend-pack' target='_blank'  rel="noopener noreferrer">Strapi Backend Pack</a>
         </Typography>
       </Box>

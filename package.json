@@ -1,14 +1,22 @@
 {
   "name": "export-import-strapi-to-excel",
-  "version": "1.1.0",
+  "version": "0.0.1",
   "description": "This plugin is designed for Strapi 5 and helps manage the export and import of big collection types within the content manager.",
-  "keywords": [],
+  "keywords": [
+    "strapi",
+    "strapi-plugin",
+    "strapi5",
+    "export",
+    "import",
+    "excel",
+    "xlsx"
+  ],
   "license": "MIT",
   "author": "Lyssenko Alexandr<lyssenko.alex@gmail.com>",
   "type": "commonjs",
   "repository": {
     "type": "git",
-    "url": "https://github.com/AlexLyssenko/strapi-export-import-excel"
+    "url": "https://github.com/AlexLyssenko/strapi-export-import-excel.git"
   },
   "exports": {
     "./package.json": "./package.json",
@@ -63,6 +71,6 @@
     "kind": "plugin",
     "name": "export-import-strapi-to-excel",
     "displayName": "Strapi Export/Import to Excel",
-    "description": "This plugin is designed for Strapi 5 and helps manage the export and import of collection types within the content manager."
+    "description": "This plugin is designed for Strapi 5 and helps manage the export and import of big collection types within the content manager."
   }
 }
