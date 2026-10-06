@@ -5,18 +5,41 @@ import { PassThrough } from 'stream';
 
 const PAGE_SIZE = 500;
 
-function flattenObject(obj) {
+const POPULATABLE_TYPES = ['relation', 'component', 'media', 'dynamiczone'];
+
+// Same attributes as populate: '*', but relations only fetch their documentId.
+// Polymorphic relations don't support field selection, so they're populated fully.
+function buildPopulate(attributes) {
   return Object.fromEntries(
-    Object.entries(obj).map(([key, value]) => [
-      key,
-      typeof value === 'object' && value !== null ? JSON.stringify(value) : value,
-    ])
+    Object.entries(attributes)
+      .filter(([, attr]) => POPULATABLE_TYPES.includes(attr.type))
+      .map(([key, attr]) => [
+        key,
+        attr.type === 'relation' && !attr.relation?.startsWith('morph')
+          ? { fields: ['documentId'] }
+          : true,
+      ])
+  );
+}
+
+function relationCell(value) {
+  if (value == null) return null;
+  if (Array.isArray(value)) return value.map(item => item.documentId).join(',');
+  return value.documentId ?? null;
+}
+
+function toRow(record, relationKeys) {
+  return Object.fromEntries(
+    Object.entries(record).map(([key, value]) => {
+      if (relationKeys.has(key)) return [key, relationCell(value)];
+      return [key, typeof value === 'object' && value !== null ? JSON.stringify(value) : value];
+    })
   );
 }
 
 const exportController = ({ strapi }) => ({
   async exportData(ctx) {
-    const { collection, startDate, endDate, _q } = ctx.query;
+    const { collection, startDate, endDate, _q, locale } = ctx.query;
 
     const startISODate = startDate ? new Date(startDate).toISOString() : null;
     const endISODate = endDate
@@ -24,6 +47,15 @@ const exportController = ({ strapi }) => ({
       : null;
 
     const modelName = `api::${collection}.${collection}`;
+    const model = strapi.getModel(modelName);
+    if (!model) {
+      return ctx.badRequest(`Unknown collection: ${collection}`);
+    }
+    const relationKeys = new Set(
+      Object.entries(model.attributes)
+        .filter(([, attr]) => attr.type === 'relation')
+        .map(([key]) => key)
+    );
 
     const filters = {};
 
@@ -42,9 +74,9 @@ const exportController = ({ strapi }) => ({
     }
 
     const baseQuery = {
-      populate: '*',
-      filters,
+      populate: buildPopulate(model.attributes),
       ...(_q ? { _q } : {}),
+      ...(locale ? { locale } : {}),
     };
 
     // Stream the workbook straight to the response: rows are serialized and
@@ -65,23 +97,30 @@ const exportController = ({ strapi }) => ({
       if (!ctx.res.writableFinished) stream.destroy();
     });
 
-    strapi.log.info(`[export-import-kkm] Streaming export of ${collection} started`);
-
     (async () => {
-      let start = 0;
+      const expected = await strapi.documents(modelName).count({ filters, ...(_q ? { _q } : {}), ...(locale ? { locale } : {}) });
+      strapi.log.info(
+        `[export-import-kkm] Streaming export of ${collection} started (${expected} documents)`
+      );
+
+      // Keyset pagination on id: offset paging without a stable order can skip or
+      // duplicate rows, and gets slower the deeper it goes.
+      let lastId = 0;
+      let written = 0;
       let headersSet = false;
 
       while (true) {
         const batch = await strapi.documents(modelName).findMany({
           ...baseQuery,
+          filters: { $and: [filters, { id: { $gt: lastId } }] },
+          sort: { id: 'asc' },
           limit: PAGE_SIZE,
-          start,
         });
 
         if (batch.length === 0) break;
 
         for (const record of batch) {
-          const flat = flattenObject(record);
+          const flat = toRow(record, relationKeys);
           if (!headersSet) {
             worksheet.columns = Object.keys(flat).map(key => ({ header: key, key }));
             headersSet = true;
@@ -89,11 +128,13 @@ const exportController = ({ strapi }) => ({
           worksheet.addRow(flat).commit();
         }
 
-        if (batch.length < PAGE_SIZE) break;
-        start += PAGE_SIZE;
+        written += batch.length;
+        lastId = batch[batch.length - 1].id;
 
-        if (start % (PAGE_SIZE * 20) === 0) {
-          strapi.log.info(`[export-import-kkm] ${collection}: ${start} rows written`);
+        if (batch.length < PAGE_SIZE) break;
+
+        if (written % (PAGE_SIZE * 20) === 0) {
+          strapi.log.info(`[export-import-kkm] ${collection}: ${written}/${expected} rows written`);
         }
 
         // Backpressure: don't fetch more while the client hasn't consumed what was sent.
@@ -108,7 +149,7 @@ const exportController = ({ strapi }) => ({
 
       worksheet.commit();
       await workbook.commit();
-      strapi.log.info(`[export-import-kkm] Export of ${collection} finished`);
+      strapi.log.info(`[export-import-kkm] Export of ${collection} finished: ${written}/${expected} rows`);
     })().catch(err => {
       strapi.log.error(`[export-import-kkm] Export of ${collection} failed: ${err.message}`);
       stream.destroy(err);

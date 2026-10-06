@@ -111,6 +111,11 @@ const ExportButton = () => {
       if (parsedQuery._q) {
         query += `&_q=${encodeURIComponent(parsedQuery._q)}`;
       }
+      // Export the locale currently shown in the Content Manager (defaults to the default locale)
+      const locale = parsedQuery.plugins?.i18n?.locale;
+      if (locale) {
+        query += `&locale=${encodeURIComponent(locale)}`;
+      }
 
       // useFetchClient always parses responses as JSON, so the binary file
       // has to be fetched with native fetch.
