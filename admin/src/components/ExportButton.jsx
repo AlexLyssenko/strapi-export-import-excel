@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Button, DatePicker, Flex } from '@strapi/design-system';
 import { useLocation } from 'react-router-dom';
-import { useFetchClient } from '@strapi/strapi/admin';
+import { useAuth, useFetchClient } from '@strapi/strapi/admin';
 import qs from 'qs';
-import * as XLSX from 'xlsx';
 
 
 const ExportButton = () => {
   const { get } = useFetchClient();
+  const token = useAuth('ExportButton', state => state.token);
   const location = useLocation();
 
   const [startDate, setStartDate] = useState('');
@@ -63,7 +63,7 @@ const ExportButton = () => {
 
     // ใช้ qs เพื่อ parse query string จาก URL
     const parsedQuery = qs.parse(location.search, { ignoreQueryPrefix: true });
-    
+
     // ตรวจสอบ filters (ยกเว้น createdAt)
     if (parsedQuery.filters) {
       let filters = parsedQuery.filters;
@@ -77,67 +77,51 @@ const ExportButton = () => {
         messageLines.push(`Filters: ${JSON.stringify(filters)}`);
       }
     }
-    
+
     // ตรวจสอบ _q (keyword search)
     if (parsedQuery._q) {
       messageLines.push(`Search Keyword: ${parsedQuery._q}`);
     }
-    
+
     // รวมข้อความแจ้งเตือน
     const confirmMessage = `Export will be performed with the following conditions:\n\n${messageLines.join('\n')}\n\nProceed?`;
-    
+
     if (!window.confirm(confirmMessage)) {
       return;
     }
-    
+
     setIsExporting(true);
 
     // ดึง collectionName จาก URL (เช่น "api::article.article" → "article")
     const parts = location.pathname.split('::');
     const collectionFull = parts[1] || '';
     const [collectionName] = collectionFull.split('.');
-    const flattenObject = (obj) => {
-      return Object.fromEntries(
-        Object.entries(obj).map(([key, value]) => [
-          key,
-          (typeof value === 'object' && value !== null) ? JSON.stringify(value) : value,
-        ])
-      );
-    };
+
     try {
-      // สร้าง query string ด้วยค่า collection, startDate, endDate
       let query = `collection=${collectionName}`;
       if (startDate && endDate) {
         query += `&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
       }
-      
-      // ถ้ามี filters จาก URL (โดยไม่เอา createdAt) ให้ส่งไปด้วย
       if (parsedQuery.filters) {
         const filtersQuery = qs.stringify({ filters: parsedQuery.filters }, { encode: false });
         if (filtersQuery) {
           query += `&${filtersQuery}`;
         }
       }
-      
-      // หากมี _q ใน query ให้ส่งไปด้วย
       if (parsedQuery._q) {
         query += `&_q=${encodeURIComponent(parsedQuery._q)}`;
       }
-      
-      // เรียก API export
-      const response = await get(`/export-import-kkm/export?${query}`);
-      const jsonData = response.data;
-      
-      const flattenedData = jsonData.map(flattenObject);
 
-      // สร้าง worksheet จาก flattenedData
-      const worksheet = XLSX.utils.json_to_sheet(flattenedData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Export Data');
-      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-      const blob = new Blob([excelBuffer], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      // useFetchClient always parses responses as JSON, so the binary file
+      // has to be fetched with native fetch.
+      const response = await fetch(`${window.strapi.backendURL}/export-import-kkm/export?${query}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error?.message || `HTTP ${response.status}`);
+      }
+      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -145,9 +129,11 @@ const ExportButton = () => {
       document.body.appendChild(a);
       a.click();
       a.remove();
+      window.URL.revokeObjectURL(url);
 
     } catch (error) {
       console.error('Export error:', error);
+      window.alert(`Export failed: ${error.message || 'Unknown error'}`);
     } finally {
       setIsExporting(false);
     }
