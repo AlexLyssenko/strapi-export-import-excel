@@ -1,1 +1,1 @@
-export const PLUGIN_ID = 'export-import-kkm';
+export const PLUGIN_ID = 'export-import-strapi-to-excel';

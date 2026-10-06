@@ -100,7 +100,7 @@ const exportController = ({ strapi }) => ({
     (async () => {
       const expected = await strapi.documents(modelName).count({ filters, ...(_q ? { _q } : {}), ...(locale ? { locale } : {}) });
       strapi.log.info(
-        `[export-import-kkm] Streaming export of ${collection} started (${expected} documents)`
+        `[export-import-strapi-to-excel] Streaming export of ${collection} started (${expected} documents)`
       );
 
       // Keyset pagination on id: offset paging without a stable order can skip or
@@ -134,7 +134,7 @@ const exportController = ({ strapi }) => ({
         if (batch.length < PAGE_SIZE) break;
 
         if (written % (PAGE_SIZE * 20) === 0) {
-          strapi.log.info(`[export-import-kkm] ${collection}: ${written}/${expected} rows written`);
+          strapi.log.info(`[export-import-strapi-to-excel] ${collection}: ${written}/${expected} rows written`);
         }
 
         // Backpressure: don't fetch more while the client hasn't consumed what was sent.
@@ -149,9 +149,9 @@ const exportController = ({ strapi }) => ({
 
       worksheet.commit();
       await workbook.commit();
-      strapi.log.info(`[export-import-kkm] Export of ${collection} finished: ${written}/${expected} rows`);
+      strapi.log.info(`[export-import-strapi-to-excel] Export of ${collection} finished: ${written}/${expected} rows`);
     })().catch(err => {
-      strapi.log.error(`[export-import-kkm] Export of ${collection} failed: ${err.message}`);
+      strapi.log.error(`[export-import-strapi-to-excel] Export of ${collection} failed: ${err.message}`);
       stream.destroy(err);
     });
   },

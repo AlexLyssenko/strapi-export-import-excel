@@ -1,5 +1,5 @@
-import myIcon from './my-icon.png'; // นำเข้าไฟล์ PNG
+import myIcon from './my-icon.png'; // Import the PNG file
 
-const MyCustomIcon = () => <img src={myIcon} alt="My Custom Icon" />; // ใช้ไฟล์ PNG
+const MyCustomIcon = () => <img src={myIcon} alt="My Custom Icon" />; // Use the PNG file
 
 export { MyCustomIcon };

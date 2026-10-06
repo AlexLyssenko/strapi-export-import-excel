@@ -1,4 +1,4 @@
-# Strapi Export/Import KKM
+# Strapi Export/Import to Excel
 
 ## Overview
 This plugin is designed for Strapi 5 and helps manage the export and import of collection types within the content manager. 
@@ -11,7 +11,7 @@ This plugin is designed for Strapi 5 and helps manage the export and import of c
 To install this plugin, run the following command in your Strapi project:
 
 ````
-npm install export-import-kkm
+npm install export-import-strapi-to-excel
 ````
 
 ## Usage

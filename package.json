@@ -1,14 +1,14 @@
 {
-  "name": "export-import-kkm",
+  "name": "export-import-strapi-to-excel",
   "version": "1.1.0",
-  "description": "This plugin is designed for Strapi 5 and helps manage the export and import of collection types within the content manager.",
+  "description": "This plugin is designed for Strapi 5 and helps manage the export and import of big collection types within the content manager.",
   "keywords": [],
   "license": "MIT",
-  "author": "“Nathawut Niemsuwan<nathawut@kidkarnmai.com>",
+  "author": "Lyssenko Alexandr<lyssenko.alex@gmail.com>",
   "type": "commonjs",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kidkarnmai/export-import-kkm"
+    "url": "https://github.com/AlexLyssenko/strapi-export-import-excel"
   },
   "exports": {
     "./package.json": "./package.json",
@@ -61,8 +61,8 @@
   },
   "strapi": {
     "kind": "plugin",
-    "name": "export-import-kkm",
-    "displayName": "Strapi Export/Import KKM",
+    "name": "export-import-strapi-to-excel",
+    "displayName": "Strapi Export/Import to Excel",
     "description": "This plugin is designed for Strapi 5 and helps manage the export and import of collection types within the content manager."
   }
 }

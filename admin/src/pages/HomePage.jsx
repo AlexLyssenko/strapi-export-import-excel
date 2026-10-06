@@ -13,7 +13,7 @@ const HomePage = () => {
   const [importCollections, setImportCollections] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  // โหลดรายการ collectionTypes
+  // Load the list of collectionTypes
   useEffect(() => {
     const fetchCollectionTypes = async () => {
       try {
@@ -24,7 +24,7 @@ const HomePage = () => {
         } else if (response.data && Array.isArray(response.data.data)) {
           collections = response.data.data;
         }
-        // กรองเฉพาะ collection types ที่ kind === 'collectionType' และ visible
+        // Keep only collection types where kind === 'collectionType' and visible
         const filtered = collections.filter(
           (ct) => ct.schema && ct.schema.kind === 'collectionType' && ct.schema.visible
         );
@@ -36,11 +36,11 @@ const HomePage = () => {
     fetchCollectionTypes();
   }, [get]);
 
-  // โหลด config ที่บันทึกไว้
+  // Load the saved config
   useEffect(() => {
     const fetchSavedConfig = async () => {
       try {
-        const response = await get('/export-import-kkm/config');
+        const response = await get('/export-import-strapi-to-excel/config');
         let config;
         if (Array.isArray(response.data)) {
           config = response.data[0];
@@ -58,7 +58,7 @@ const HomePage = () => {
     fetchSavedConfig();
   }, [get]);
 
-  // Handle toggle สำหรับ Export
+  // Handle toggle for Export
   const handleExportToggle = (uid) => {
     if (exportCollections.includes(uid)) {
       setExportCollections(exportCollections.filter((v) => v !== uid));
@@ -67,7 +67,7 @@ const HomePage = () => {
     }
   };
 
-  // Handle toggle สำหรับ Import
+  // Handle toggle for Import
   const handleImportToggle = (uid) => {
     if (importCollections.includes(uid)) {
       setImportCollections(importCollections.filter((v) => v !== uid));
@@ -79,7 +79,7 @@ const HomePage = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const response = await post('/export-import-kkm/config', {
+      const response = await post('/export-import-strapi-to-excel/config', {
         data: {
           selectedExportCollections: exportCollections,
           selectedImportCollections: importCollections,
@@ -109,7 +109,7 @@ const HomePage = () => {
       <Box padding={4}>
         <Divider />
       </Box>
-      {/* สร้าง layout สองคอลัมน์ */} 
+      {/* Two-column layout */} 
       <Flex gap={8} alignItems="flex-start">
         {/* Column Export */}
         <Box width="50%" padding={4} borderColor={{initial: '#fff'}}>

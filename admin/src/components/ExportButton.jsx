@@ -16,11 +16,11 @@ const ExportButton = () => {
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
 
-  // โหลด config เพื่อรับค่า selectedExportCollections
+  // Load config to get selectedExportCollections
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const response = await get('/export-import-kkm/config');
+        const response = await get('/export-import-strapi-to-excel/config');
         let config;
         if (Array.isArray(response.data)) {
           config = response.data[0];
@@ -41,7 +41,7 @@ const ExportButton = () => {
     fetchConfig();
   }, [get]);
 
-  // ดึง content type จาก URL เช่น "/content-manager/collection-types/api::article.article"
+  // Get the content type from the URL, e.g. "/content-manager/collection-types/api::article.article"
   const segments = location.pathname.split('/');
   const lastSegment = segments[segments.length - 1];
   const currentContentType = lastSegment;
@@ -49,10 +49,10 @@ const ExportButton = () => {
   if (!allowedExportCollections.includes(currentContentType)) return null;
 
   const handleExport = async () => {
-    // สร้างข้อความแจ้งเตือนโดยพิจารณาจากเงื่อนไขที่ใช้ในการ export
+    // Build the confirmation message from the conditions used for the export
     let messageLines = [];
 
-    // เงื่อนไขวันที่
+    // Date conditions
     if (startDate && endDate) {
       messageLines.push(`Date Range: ${startDate} to ${endDate}`);
     } else if (!startDate && !endDate) {
@@ -61,10 +61,10 @@ const ExportButton = () => {
       messageLines.push('Incomplete date filter provided (exporting ALL data)');
     }
 
-    // ใช้ qs เพื่อ parse query string จาก URL
+    // Use qs to parse the query string from the URL
     const parsedQuery = qs.parse(location.search, { ignoreQueryPrefix: true });
 
-    // ตรวจสอบ filters (ยกเว้น createdAt)
+    // Check filters (excluding createdAt)
     if (parsedQuery.filters) {
       let filters = parsedQuery.filters;
       if (filters.$and && Array.isArray(filters.$and)) {
@@ -72,18 +72,18 @@ const ExportButton = () => {
       } else if (filters.createdAt) {
         delete filters.createdAt;
       }
-      // หาก filters ไม่ว่าง ให้เพิ่มข้อความ
+      // If filters are not empty, add them to the message
       if (filters && Object.keys(filters).length > 0) {
         messageLines.push(`Filters: ${JSON.stringify(filters)}`);
       }
     }
 
-    // ตรวจสอบ _q (keyword search)
+    // Check _q (keyword search)
     if (parsedQuery._q) {
       messageLines.push(`Search Keyword: ${parsedQuery._q}`);
     }
 
-    // รวมข้อความแจ้งเตือน
+    // Combine the confirmation message
     const confirmMessage = `Export will be performed with the following conditions:\n\n${messageLines.join('\n')}\n\nProceed?`;
 
     if (!window.confirm(confirmMessage)) {
@@ -92,7 +92,7 @@ const ExportButton = () => {
 
     setIsExporting(true);
 
-    // ดึง collectionName จาก URL (เช่น "api::article.article" → "article")
+    // Get collectionName from the URL (e.g. "api::article.article" → "article")
     const parts = location.pathname.split('::');
     const collectionFull = parts[1] || '';
     const [collectionName] = collectionFull.split('.');
@@ -119,7 +119,7 @@ const ExportButton = () => {
 
       // useFetchClient always parses responses as JSON, so the binary file
       // has to be fetched with native fetch.
-      const response = await fetch(`${window.strapi.backendURL}/export-import-kkm/export?${query}`, {
+      const response = await fetch(`${window.strapi.backendURL}/export-import-strapi-to-excel/export?${query}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) {

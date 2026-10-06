@@ -19,11 +19,11 @@ const ImportButton = () => {
 
   const fileInputRef = useRef(null);
 
-  // โหลด config เพื่อดูว่า collection นี้อนุญาตให้ import หรือไม่
+  // Load config to check whether this collection allows import
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const response = await get('/export-import-kkm/config');
+        const response = await get('/export-import-strapi-to-excel/config');
         let config;
         if (Array.isArray(response.data)) {
           config = response.data[0];
@@ -44,21 +44,21 @@ const ImportButton = () => {
     fetchConfig();
   }, [get]);
 
-  // ตรวจสอบว่าหน้าปัจจุบันอยู่ใน collection ที่อนุญาตหรือไม่
+  // Check whether the current page belongs to an allowed collection
   const segments = location.pathname.split('/');
   const lastSegment = segments[segments.length - 1];
   const currentContentType = lastSegment;
   if (loadingConfig) return null;
   if (!allowedImportCollections.includes(currentContentType)) return null;
 
-  // ฟังก์ชันเพื่อเปิด file input (ซ่อน)
+  // Open the (hidden) file input
   const triggerFileInput = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
   };
 
-  // เมื่อผู้ใช้เลือกไฟล์ อ่านและแปลงข้อมูลเป็น array-of-objects โดยใช้แถวแรกเป็น header
+  // When the user selects a file, read it and convert it to an array of objects using the first row as the header
   const handleFileChange = (event) => {
     const selectedFile = event.target.files[0];
     if (!selectedFile) return;
@@ -70,17 +70,17 @@ const ImportButton = () => {
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
 
-      // อ่านข้อมูลทั้งหมดในรูปแบบ array-of-arrays
+      // Read all data as an array of arrays
       let rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
       if (rows.length === 0) {
         setDataRows([]);
         return;
       }
-      // แยกแถวแรกเป็น headerRow
+      // Take the first row as headerRow
       const [headerRow, ...bodyRows] = rows;
-      // กรองแถวว่าง
+      // Filter out empty rows
       const filteredBody = bodyRows.filter((row) => row.some((cell) => cell));
-      // แปลงแต่ละ row เป็น object โดยใช้ headerRow เป็น key
+      // Convert each row to an object using headerRow as keys
       const mappedData = filteredBody.map((row) => {
         const obj = {};
         row.forEach((cellValue, colIndex) => {
@@ -95,13 +95,13 @@ const ImportButton = () => {
     reader.readAsBinaryString(selectedFile);
   };
 
-  // ฟังก์ชันส่งข้อมูล import แบบแบ่งเป็น batch
+  // Send import data in batches
   const handleImport = async () => {
     if (dataRows.length === 0) {
       console.error('No data to import');
       return;
     }
-    // ดึง collectionName จาก URL เช่น "/content-manager/collection-types/api::article.article"
+    // Get collectionName from the URL, e.g. "/content-manager/collection-types/api::article.article"
     const parts = location.pathname.split('::');
     const collectionFull = parts[1] || '';
     const [collectionName] = collectionFull.split('.');
@@ -115,10 +115,10 @@ const ImportButton = () => {
       const batchSize = 100;
       for (let i = 0; i < dataRows.length; i += batchSize) {
         const batch = dataRows.slice(i, i + batchSize);
-        const response = await post('/export-import-kkm/import', {
+        const response = await post('/export-import-strapi-to-excel/import', {
           data: {
             rows: batch,
-            collectionName, // ส่งค่า collectionName ไปด้วย
+            collectionName, // Also send collectionName
           },
         });
         console.log(`Batch ${i / batchSize + 1} imported:`, response.data);
@@ -141,18 +141,18 @@ const ImportButton = () => {
     }
   };
 
-  // ฟังก์ชันปิด Modal Result และ reload หน้า
+  // Close the result modal and reload the page
   const handleCloseResultModal = () => {
     setShowResultModal(false);
     window.location.reload();
   };
 
-  // ฟังก์ชันปิด Confirm Modal (ยกเลิก)
+  // Close the confirm modal (cancel)
   const handleCloseConfirmModal = () => {
     setShowConfirmModal(false);
   };
 
-  // ฟังก์ชัน Confirm Import (เมื่อกด Confirm ใน Modal)
+  // Confirm import (when Confirm is clicked in the modal)
   const handleConfirmImport = async () => {
     setShowConfirmModal(false);
     await handleImport();
