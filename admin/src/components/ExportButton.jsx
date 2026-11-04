@@ -49,6 +49,9 @@ const getOperators = type => {
       ...NULL_OPERATORS,
     ];
   }
+  if (type === 'status') {
+    return [{ value: '$eq', label: 'is' }, { value: '$ne', label: 'is not' }];
+  }
   if (type === 'relation') {
     return [{ value: '$eq', label: 'documentId is' }, ...NULL_OPERATORS];
   }
@@ -223,9 +226,16 @@ const ExportButton = () => {
           query += `&${filtersQuery}`;
         }
       }
-      if (activeRows.length > 0) {
-        const fieldFilters = activeRows.map(row => toCondition(row, fieldByName(row.field)));
+      // Status is computed on the server, so it travels separately from the field filters.
+      const statusRows = activeRows.filter(row => fieldByName(row.field).type === 'status');
+      const fieldRows = activeRows.filter(row => fieldByName(row.field).type !== 'status');
+      if (fieldRows.length > 0) {
+        const fieldFilters = fieldRows.map(row => toCondition(row, fieldByName(row.field)));
         query += `&${qs.stringify({ fieldFilters })}`;
+      }
+      if (statusRows.length > 0) {
+        const statusFilters = statusRows.map(row => ({ [row.operator]: row.value }));
+        query += `&${qs.stringify({ statusFilters })}`;
       }
       if (parsedQuery._q) {
         query += `&_q=${encodeURIComponent(parsedQuery._q)}`;
@@ -286,7 +296,7 @@ const ExportButton = () => {
                 const field = fieldByName(row.field);
                 const operators = field ? getOperators(field.type) : [];
                 const needsValue = field && row.operator && !isNullOperator(row.operator);
-                const isSelectValue = field && (field.type === 'boolean' || field.type === 'enumeration');
+                const isSelectValue = field && ['boolean', 'enumeration', 'status'].includes(field.type);
                 return (
                   <Flex key={row.key} gap={2} alignItems="flex-end">
                     <SingleSelect
@@ -368,7 +378,7 @@ const ExportButton = () => {
         </Modal.Content>
       </Modal.Root>
       <Button onClick={handleExport} disabled={isExporting}>
-        {isExporting ? 'Exporting...' : 'Export3'}
+        {isExporting ? 'Exporting...' : 'Export'}
       </Button>
     </Flex>
   );

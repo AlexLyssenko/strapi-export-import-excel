@@ -75,6 +75,19 @@ async function getStatuses(strapi, modelName, model, batch) {
   );
 }
 
+const STATUSES = ['draft', 'published', 'modified'];
+
+// Status is computed, not stored, so status filters are applied to each batch in memory.
+// statusFilters: an array of { $eq | $ne: 'draft' | 'published' | 'modified' } conditions.
+const matchesStatusFilters = (status, statusFilters) =>
+  statusFilters.every(condition =>
+    Object.entries(condition).every(([operator, value]) => {
+      if (operator === '$eq') return status === value;
+      if (operator === '$ne') return status !== value;
+      return true;
+    })
+  );
+
 const exportController = ({ strapi }) => ({
   async getFields(ctx) {
     const { collection } = ctx.query;
@@ -93,11 +106,15 @@ const exportController = ({ strapi }) => ({
           type: attr.type,
           ...(attr.enum ? { enum: attr.enum } : {}),
         })),
+      // Without Draft & Publish every entry is "published", so the filter would be pointless.
+      ...(model.options?.draftAndPublish
+        ? [{ name: statusColumnName(model.attributes), type: 'status', enum: STATUSES }]
+        : []),
     ];
   },
 
   async exportData(ctx) {
-    const { collection, startDate, endDate, _q, locale, fieldFilters } = ctx.query;
+    const { collection, startDate, endDate, _q, locale, fieldFilters, statusFilters } = ctx.query;
 
     const startISODate = startDate ? new Date(startDate).toISOString() : null;
     const endISODate = endDate
@@ -116,6 +133,7 @@ const exportController = ({ strapi }) => ({
     );
 
     const statusColumn = statusColumnName(model.attributes);
+    const statusConditions = Array.isArray(statusFilters) ? statusFilters : [];
 
     const filters = {};
 
@@ -171,6 +189,7 @@ const exportController = ({ strapi }) => ({
       // Keyset pagination on id: offset paging without a stable order can skip or
       // duplicate rows, and gets slower the deeper it goes.
       let lastId = 0;
+      let scanned = 0;
       let written = 0;
       let headersSet = false;
 
@@ -187,20 +206,23 @@ const exportController = ({ strapi }) => ({
         const statuses = await getStatuses(strapi, modelName, model, batch);
 
         for (const record of batch) {
-          const flat = { ...toRow(record, relationKeys), [statusColumn]: statuses.get(record.id) };
+          const status = statuses.get(record.id);
+          if (!matchesStatusFilters(status, statusConditions)) continue;
+          const flat = { ...toRow(record, relationKeys), [statusColumn]: status };
           if (!headersSet) {
             worksheet.columns = Object.keys(flat).map(key => ({ header: key, key }));
             headersSet = true;
           }
           worksheet.addRow(flat).commit();
+          written++;
         }
 
-        written += batch.length;
+        scanned += batch.length;
         lastId = batch[batch.length - 1].id;
 
         if (batch.length < PAGE_SIZE) break;
 
-        if (written % (PAGE_SIZE * 20) === 0) {
+        if (scanned % (PAGE_SIZE * 20) === 0) {
           strapi.log.info(`[export-import-strapi-to-excel] ${collection}: ${written}/${expected} rows written`);
         }
 
