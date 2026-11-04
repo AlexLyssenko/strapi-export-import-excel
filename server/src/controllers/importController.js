@@ -24,6 +24,12 @@ const importController = ({ strapi }) => ({
       'localizations'
     ];
 
+    // Status column added by the export; skip it unless it's a real attribute of the collection.
+    const contentTypeAttributes = strapi.getModel(modelName)?.attributes || {};
+    for (const key of ['status', 'publicationStatus']) {
+      if (!(key in contentTypeAttributes)) excludedKeys.push(key);
+    }
+
     const tryParseJSON = (value) => {
       if (typeof value === 'string') {
         const trimmed = value.trim();

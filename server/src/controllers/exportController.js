@@ -44,6 +44,37 @@ const FILTERABLE_TYPES = [
   'date', 'datetime', 'time', 'boolean', 'relation',
 ];
 
+// Name of the extra column holding the Content Manager status (draft / published / modified).
+// Falls back to another name if the collection already has a "status" attribute.
+const statusColumnName = attributes => ('status' in attributes ? 'publicationStatus' : 'status');
+
+// Same rules as the Content Manager list view: a document is "modified" when its
+// draft was updated after the published version.
+async function getStatuses(strapi, modelName, model, batch) {
+  if (!model.options?.draftAndPublish) {
+    return new Map(batch.map(record => [record.id, 'published']));
+  }
+  const locales = batch.map(record => record.locale).filter(Boolean);
+  const published = await strapi.query(modelName).findMany({
+    where: {
+      documentId: { $in: batch.map(record => record.documentId) },
+      publishedAt: { $notNull: true },
+      ...(locales.length ? { locale: { $in: locales } } : {}),
+    },
+    select: ['documentId', 'locale', 'updatedAt'],
+  });
+  const publishedByKey = new Map(published.map(p => [`${p.documentId}:${p.locale ?? ''}`, p]));
+
+  return new Map(
+    batch.map(record => {
+      const pub = publishedByKey.get(`${record.documentId}:${record.locale ?? ''}`);
+      if (!pub) return [record.id, 'draft'];
+      const modified = new Date(record.updatedAt).getTime() > new Date(pub.updatedAt).getTime();
+      return [record.id, modified ? 'modified' : 'published'];
+    })
+  );
+}
+
 const exportController = ({ strapi }) => ({
   async getFields(ctx) {
     const { collection } = ctx.query;
@@ -83,6 +114,8 @@ const exportController = ({ strapi }) => ({
         .filter(([, attr]) => attr.type === 'relation')
         .map(([key]) => key)
     );
+
+    const statusColumn = statusColumnName(model.attributes);
 
     const filters = {};
 
@@ -151,8 +184,10 @@ const exportController = ({ strapi }) => ({
 
         if (batch.length === 0) break;
 
+        const statuses = await getStatuses(strapi, modelName, model, batch);
+
         for (const record of batch) {
-          const flat = toRow(record, relationKeys);
+          const flat = { ...toRow(record, relationKeys), [statusColumn]: statuses.get(record.id) };
           if (!headersSet) {
             worksheet.columns = Object.keys(flat).map(key => ({ header: key, key }));
             headersSet = true;
