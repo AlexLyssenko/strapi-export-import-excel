@@ -9,6 +9,15 @@ export default [
     },
   },
   {
+    method: 'GET',
+    path: '/fields',
+    handler: 'exportController.getFields',
+    config: {
+      policies: [],
+     
+    },
+  },
+  {
     method: 'POST',
     path: '/import',
     handler: 'importController.importData',

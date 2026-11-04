@@ -37,9 +37,36 @@ function toRow(record, relationKeys) {
   );
 }
 
+// Attribute types that can be filtered from the export dialog.
+const FILTERABLE_TYPES = [
+  'string', 'text', 'richtext', 'email', 'uid', 'enumeration',
+  'integer', 'biginteger', 'float', 'decimal',
+  'date', 'datetime', 'time', 'boolean', 'relation',
+];
+
 const exportController = ({ strapi }) => ({
+  async getFields(ctx) {
+    const { collection } = ctx.query;
+    const model = strapi.getModel(`api::${collection}.${collection}`);
+    if (!model) {
+      return ctx.badRequest(`Unknown collection: ${collection}`);
+    }
+    ctx.body = [
+      { name: 'id', type: 'integer' },
+      { name: 'documentId', type: 'string' },
+      ...Object.entries(model.attributes)
+        .filter(([, attr]) => FILTERABLE_TYPES.includes(attr.type))
+        .filter(([, attr]) => attr.type !== 'relation' || !attr.relation?.startsWith('morph'))
+        .map(([name, attr]) => ({
+          name,
+          type: attr.type,
+          ...(attr.enum ? { enum: attr.enum } : {}),
+        })),
+    ];
+  },
+
   async exportData(ctx) {
-    const { collection, startDate, endDate, _q, locale } = ctx.query;
+    const { collection, startDate, endDate, _q, locale, fieldFilters } = ctx.query;
 
     const startISODate = startDate ? new Date(startDate).toISOString() : null;
     const endISODate = endDate
@@ -71,6 +98,11 @@ const exportController = ({ strapi }) => ({
 
     if (startISODate && endISODate) {
       filters.createdAt = { $gte: startISODate, $lt: endISODate };
+    }
+
+    // Field filters from the export dialog: an array of { field: { $op: value } } conditions.
+    if (Array.isArray(fieldFilters) && fieldFilters.length > 0) {
+      filters.$and = [...(Array.isArray(filters.$and) ? filters.$and : []), ...fieldFilters];
     }
 
     const baseQuery = {
