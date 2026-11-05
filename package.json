@@ -1,6 +1,6 @@
 {
   "name": "export-import-strapi-to-excel",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "This plugin is designed for Strapi 5 and helps manage the export and import of big collection types within the content manager.",
   "keywords": [
     "strapi",

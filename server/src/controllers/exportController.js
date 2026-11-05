@@ -88,6 +88,29 @@ const matchesStatusFilters = (status, statusFilters) =>
     })
   );
 
+// The Content Manager list view (Strapi >= 5.x) puts its "Status" filter in the URL as
+// filters[$and][i][__status][$eq]. It isn't a real attribute, so it's translated to export statuses.
+const LIST_VIEW_STATUS = {
+  draft: { $eq: 'draft' },
+  published: { $ne: 'draft' }, // has a published version, modified or not
+  'published-modified': { $eq: 'modified' },
+  'published-unmodified': { $eq: 'published' },
+};
+
+const extractListViewStatus = conditions => {
+  const remaining = [];
+  const statusConditions = [];
+  for (const condition of conditions) {
+    if (condition && typeof condition === 'object' && '__status' in condition) {
+      const mapped = LIST_VIEW_STATUS[condition.__status?.$eq];
+      if (mapped) statusConditions.push(mapped);
+    } else {
+      remaining.push(condition);
+    }
+  }
+  return { remaining, statusConditions };
+};
+
 const exportController = ({ strapi }) => ({
   async getFields(ctx) {
     const { collection } = ctx.query;
@@ -133,17 +156,21 @@ const exportController = ({ strapi }) => ({
     );
 
     const statusColumn = statusColumnName(model.attributes);
-    const statusConditions = Array.isArray(statusFilters) ? statusFilters : [];
+    const statusConditions = Array.isArray(statusFilters) ? [...statusFilters] : [];
 
     const filters = {};
 
     if (ctx.query.filters) {
       const userFilters = { ...ctx.query.filters };
       if (userFilters.$and && Array.isArray(userFilters.$and)) {
-        userFilters.$and = userFilters.$and.filter(condition => !('createdAt' in condition));
+        const { remaining, statusConditions: listViewStatus } = extractListViewStatus(userFilters.$and);
+        statusConditions.push(...listViewStatus);
+        userFilters.$and = remaining.filter(condition => !('createdAt' in condition));
+        if (userFilters.$and.length === 0) delete userFilters.$and;
       } else if (userFilters.createdAt) {
         delete userFilters.createdAt;
       }
+      delete userFilters.__status;
       Object.assign(filters, userFilters);
     }
 
